@@ -1,0 +1,74 @@
+        #region Mail Sending
+        async public static Task<bool> RepairAppManagerEmailsendingAsync(int DocEntry, int DocNum, String AppUSer, string RemarksForDocument,string cardcode,string cardname)
+        {
+            string SMTPUserid = "", FromEmailID = "", ToEmailID = "", SMTPServer = "", SMTPPwd = "";
+            int SMTPPortno;
+            string AppRejURl;
+            string body = string.Empty;
+            string ApprovedURL = string.Empty;
+            string RejectURL = string.Empty;
+            string Encryptkey = "Uneecops";
+
+            System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
+
+            SMTPUserid = System.Configuration.ConfigurationManager.AppSettings["SMTPUserid"].ToString();
+            FromEmailID = System.Configuration.ConfigurationManager.AppSettings["FromEmailID"].ToString();
+            SMTPServer = System.Configuration.ConfigurationManager.AppSettings["SMTPServer"].ToString();
+            SMTPPortno = Convert.ToInt32(System.Configuration.ConfigurationManager.AppSettings["SMTPPortno"].ToString());
+            SMTPPwd = System.Configuration.ConfigurationManager.AppSettings["SMTPPwd"].ToString();
+            AppRejURl = System.Configuration.ConfigurationManager.AppSettings["DocumentStatusUpdate"].ToString();
+
+            try
+            {
+                Manager manager = RepairAppUserManagerMail(AppUSer);
+                string managername = manager.MangerName;
+                string data1 = EncryptDecrypt.Encrypt("DocNumber=" + DocNum + ",DocEntry=" + DocEntry + ",ApprovalFlag=Approved,Remarks=Comment,Token=abcd,ApproverName=" + managername, Encryptkey);
+                string data2 = EncryptDecrypt.Encrypt("DocNumber=" + DocNum + ",DocEntry=" + DocEntry + ",ApprovalFlag=Rejected" +
+                    ",Remarks=Comment,Token=abcdt,ApproverName=" + managername, Encryptkey);
+                if (AppRejURl != null)
+                {
+
+                    ApprovedURL = AppRejURl + "data=" + data1;
+                    RejectURL = AppRejURl + "data=" + data2;
+                }
+                ToEmailID = manager.ManagerEmail;
+                using (var client = new SmtpClient(SMTPServer, SMTPPortno))
+                using (var message = new MailMessage())
+                {
+                    client.UseDefaultCredentials = false;
+                    client.Credentials = new NetworkCredential(FromEmailID, SMTPPwd);
+                    client.EnableSsl = true;
+                    message.From = new MailAddress(SMTPUserid);
+                    message.To.Add(ToEmailID);
+                    message.Subject = "Repair Order (Repair Order No. "+DocNum+"), Doc Entry. "+DocEntry+" For Approval - "+cardcode+" - "+cardname+"";
+                    message.IsBodyHtml = true;
+
+                    body = "<html><body>" +
+                            "<h3>Dear Sir,<h3>"+
+                            "<h3>Please find the attached Repair order for approval and kindly confirm with the status.</h3>" +
+                            "<table cellspacing = '0' cellpadding = '0' border = '0'>" +
+                            "<tr><td align = 'center' style = 'background-color: #007bff; padding: 10px;'>" +
+                            "<a href = '" + ApprovedURL + "' style ='text-decoration: none; color: #fff; display: inline-block; padding: 10px 20px; border-radius: 5px;'> Accept </a></td>" +
+                            "<td width = '20'></td>" +
+                            "<td align = 'center' style = 'background-color: #dc3545; padding: 10px;'>" +
+                            "<a href = '" + RejectURL + "' style = 'text-decoration: none; color: #fff; display: inline-block; padding: 10px 20px; border-radius: 5px;'> Reject </a>" +
+                            "</td></tr></table>" +
+                            "<p>Remarks - " + RemarksForDocument + "</p>" +
+                            "</body></html>";
+
+                    message.Body = body;
+                    System.Net.Mail.Attachment attachment = new System.Net.Mail.Attachment("C:\\UTL2140\\Tanuj.pdf");
+                    message.Attachments.Add(attachment);
+                    ServicePointManager.ServerCertificateValidationCallback =
+                        (sender, certificate, chain, sslPolicyErrors) => true;
+
+                    await client.SendMailAsync(message);
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+        #endregion
